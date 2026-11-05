@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: veylora-web
+    runtime: docker
+    healthCheckPath: /
+    envVars:
+      - key: API_URL
+        sync: false
