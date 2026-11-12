@@ -30,6 +30,7 @@ import { AuthService } from '../core/auth.service';
         <a routerLink="/templates" routerLinkActive="active">Templates</a>
         <a routerLink="/audio" routerLinkActive="active">Audio</a>
         <a routerLink="/logs" routerLinkActive="active">Logs</a>
+        <a routerLink="/settings" routerLinkActive="active">Settings</a>
       </nav>
       <span class="muted">{{ auth.user()?.name }}</span>
       <button class="ghost" (click)="auth.logout()">Log out</button>

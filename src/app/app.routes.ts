@@ -15,6 +15,7 @@ export const routes: Routes = [
       { path: 'campaigns/:id', loadComponent: () => import('./pages/campaign-detail').then(m => m.CampaignDetailPage) },
       { path: 'templates', loadComponent: () => import('./pages/templates').then(m => m.TemplatesPage) },
       { path: 'audio', loadComponent: () => import('./pages/audio').then(m => m.AudioPage) },
+      { path: 'settings', loadComponent: () => import('./pages/settings').then(m => m.SettingsPage) },
       { path: 'logs', loadComponent: () => import('./pages/logs').then(m => m.LogsPage) }
     ]
   },
