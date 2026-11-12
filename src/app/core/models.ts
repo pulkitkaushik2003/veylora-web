@@ -57,3 +57,5 @@ export interface AudioAsset {
   type: 'UPLOADED_AUDIO' | 'TTS_GENERATED'; ttsScript: string | null; voiceName: string | null; active: boolean;
   createdAt: string; audioUrl: string;
 }
+
+export interface MailSettings { custom: boolean; email: string | null; host: string | null; port: number; defaultAvailable: boolean; }

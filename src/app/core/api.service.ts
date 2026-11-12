@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  AddResult, Attachment, AudioAsset, Campaign, MatchReport, PersonalFileInfo, UploadResult, CallLog, CreateCampaign, Device, Email, Recipient, Sms, Summary, Template, User
+  AddResult, Attachment, MailSettings, AudioAsset, Campaign, MatchReport, PersonalFileInfo, UploadResult, CallLog, CreateCampaign, Device, Email, Recipient, Sms, Summary, Template, User
 } from './models';
 
 /** Every call to the Veylora backend. Paths are relative, so the dev proxy (proxy.conf.json) forwards them. */
@@ -15,6 +15,12 @@ export class ApiService {
   login(email: string, password: string) { return this.http.post<User>('/api/v1/auth/login', { email, password }); }
   register(name: string, email: string, password: string) { return this.http.post<User>('/api/v1/auth/register', { name, email, password }); }
   logout() { return this.http.post<void>('/api/v1/auth/logout', {}); }
+
+  // the user's own sending mailbox
+  mailSettings() { return this.http.get<MailSettings>('/api/v1/mail-settings'); }
+  saveMailSettings(body: { email: string; password: string; host?: string; port?: number }) { return this.http.put<MailSettings>('/api/v1/mail-settings', body); }
+  removeMailSettings() { return this.http.delete<MailSettings>('/api/v1/mail-settings'); }
+  testMail(to: string) { return this.http.post<{ status: string }>('/api/v1/mail-settings/test', { to }); }
 
   // dashboard
   summary() { return this.http.get<Summary>('/api/v1/dashboard/summary'); }
