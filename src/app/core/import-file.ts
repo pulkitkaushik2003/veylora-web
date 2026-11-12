@@ -1,6 +1,6 @@
 import { readSheet } from 'read-excel-file/browser';
 
-export interface ImportResult { lines: string[]; skipped: number; }
+export interface ImportResult { lines: string[]; skipped: number; docs?: { email: string; file: string }[]; }
 
 /** Splits one CSV line, handling "quoted, values". */
 function splitCsvLine(line: string, sep: string): string[] {
@@ -76,6 +76,11 @@ export async function importRecipients(file: File, kind: 'EMAIL' | 'PHONE'): Pro
   const addrCol = kind === 'EMAIL' ? find('email', 'e-mail', 'mail') : find('phone', 'mobile', 'number', 'contact', 'cell');
   const nameCol = find('name');
   const hasHeader = addrCol >= 0;
+  // Optional document column (email campaigns): the file name to send to that person.
+  const docCol = kind === 'EMAIL' && hasHeader
+    ? header.findIndex((h, i) => i !== addrCol && i !== nameCol && ['file', 'document', 'doc', 'attachment', 'pdf', 'certificate'].some(n => h === n || h.includes(n)))
+    : -1;
+  const docs: { email: string; file: string }[] = [];
 
   const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   const isPhone = /^\+?[0-9][0-9 ()\-.]{5,}$/;
@@ -89,6 +94,8 @@ export async function importRecipients(file: File, kind: 'EMAIL' | 'PHONE'): Pro
     if (!address) continue;
     if (!valid(address)) { skipped++; continue; }
     lines.push(name && !valid(name) ? `${name.replace(/[,;]/g, ' ')},${address}` : address);
+    const doc = docCol >= 0 ? (row[docCol] ?? '').trim() : '';
+    if (doc) docs.push({ email: address, file: doc });
   }
-  return { lines, skipped };
+  return { lines, skipped, docs };
 }

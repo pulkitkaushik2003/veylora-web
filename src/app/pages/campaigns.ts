@@ -64,6 +64,12 @@ import { importRecipients } from '../core/import-file';
           <select [(ngModel)]="f.selectedSimSlot"><option [ngValue]="undefined">Default</option><option [ngValue]="1">SIM 1</option><option [ngValue]="2">SIM 2</option></select>
         }
         @if (f.type === 'EMAIL') {
+          <label>Personal documents: a .zip (or several PDF/JPG/PNG files), one per person</label>
+          <input type="file" multiple accept=".zip,.pdf,.jpg,.jpeg,.png" (change)="pickZip($any($event.target))">
+          @if (zipFiles.length) { <p class="muted">{{ zipFiles.length }} file(s): {{ zipNames() }}</p> }
+          <p class="muted">In the Excel/CSV add a third column called <b>document</b> with the file name for each person (for example cert_rahul.pdf).
+            After creating, each file is matched to its email and sent only to that person.</p>
+          @if (docPairs.length) { <p class="muted">{{ docPairs.length }} document name(s) read from the sheet.</p> }
           <label>Attach files (PDF, JPG, PNG. Max 5 files, 5 MB each, 10 MB total)</label>
           <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" (change)="pickFiles($any($event.target))">
           @if (files.length) { <p class="muted">{{ files.length }} file(s): {{ fileNames() }}</p> }
@@ -113,6 +119,8 @@ export class CampaignsPage implements OnInit, OnDestroy {
   ok = signal(false);
   numbers = '';
   files: File[] = [];
+  zipFiles: File[] = [];
+  docPairs: { email: string; file: string }[] = [];
   importNote = signal('');
   f: any = this.blank();
   private timer?: any;
@@ -130,6 +138,8 @@ export class CampaignsPage implements OnInit, OnDestroy {
   ngOnDestroy() { clearInterval(this.timer); }
 
   fileNames() { return this.files.map(f => f.name).join(', '); }
+  zipNames() { return this.zipFiles.map(f => f.name).join(', '); }
+  pickZip(input: HTMLInputElement) { this.zipFiles = Array.from(input.files ?? []); }
   pickFiles(input: HTMLInputElement) { this.files = Array.from(input.files ?? []); }
 
   async loadFile(input: HTMLInputElement) {
@@ -138,7 +148,8 @@ export class CampaignsPage implements OnInit, OnDestroy {
     try {
       const r = await importRecipients(file, this.f.type === 'EMAIL' ? 'EMAIL' : 'PHONE');
       this.numbers = [this.numbers.trim(), ...r.lines].filter(Boolean).join('\n');
-      this.importNote.set(`Loaded ${r.lines.length} rows from ${file.name}` + (r.skipped ? `, ${r.skipped} skipped (not a valid ${this.f.type === 'EMAIL' ? 'email' : 'phone number'})` : '') + '. Check the box above before creating.');
+      if (r.docs?.length) this.docPairs = [...this.docPairs, ...r.docs];
+      this.importNote.set(`Loaded ${r.lines.length} rows from ${file.name}` + (r.skipped ? `, ${r.skipped} skipped (not a valid ${this.f.type === 'EMAIL' ? 'email' : 'phone number'})` : '') + (r.docs?.length ? `, ${r.docs.length} document name(s) found` : '') + '. Check the box above before creating.');
     } catch (e: any) {
       this.importNote.set(e?.message || 'Could not read that file.');
     }
@@ -185,9 +196,23 @@ export class CampaignsPage implements OnInit, OnDestroy {
             try { await firstValueFrom(this.api.uploadAttachment(c.id, file)); }
             catch (e) { failed += ` ${file.name}: ${errorText(e)}`; }
           }
+          let docNote = '';
+          let docBad = false;
+          if (isEmail && (this.zipFiles.length || this.docPairs.length)) {
+            try {
+              if (this.zipFiles.length) {
+                const u = await firstValueFrom(this.api.uploadPersonal(c.id, this.zipFiles));
+                docNote += `, ${u.added + u.replaced} document(s) uploaded` + (u.skipped.length ? ` (${u.skipped.length} skipped: ${u.skipped.slice(0, 3).join('; ')})` : '');
+              }
+              if (this.docPairs.length) await firstValueFrom(this.api.saveDocList(c.id, this.docPairs));
+              const m = await firstValueFrom(this.api.checkPersonal(c.id));
+              docNote += `, ${m.matched} of ${m.recipients} matched with a document`;
+              if (m.missingCount) { docNote += `. NOT matched (${m.missingCount}): ${m.missingSample.slice(0, 5).join(', ')}. Fix before pressing Start`; docBad = true; }
+            } catch (e) { docNote += '. Documents failed: ' + errorText(e); docBad = true; }
+          }
           this.busy.set(false);
-          this.say(note + (this.files.length ? `, ${this.files.length - (failed ? 1 : 0)} file(s) attached` : '') + '. Press Start when ready.' + (failed ? ' Some files were not attached:' + failed : ''), !failed);
-          this.f = this.blank(); this.numbers = ''; this.files = []; this.importNote.set(''); this.showForm.set(false); this.load();
+          this.say(note + docNote + (this.files.length ? `, ${this.files.length - (failed ? 1 : 0)} file(s) attached` : '') + '. Press Start when ready.' + (failed ? ' Some files were not attached:' + failed : ''), !failed && !docBad);
+          this.f = this.blank(); this.numbers = ''; this.files = []; this.zipFiles = []; this.docPairs = []; this.importNote.set(''); this.showForm.set(false); this.load();
         },
         error: e => { this.busy.set(false); this.say('Campaign created but adding recipients failed: ' + errorText(e), false); this.load(); }
       }),
